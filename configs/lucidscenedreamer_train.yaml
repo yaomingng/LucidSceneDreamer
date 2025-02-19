@@ -1,4 +1,11 @@
-pretrained_weight: ./scenedreamer_released.pt #added pretrained weight
+pretrained_weight: ./scenedreamer_models/scenedreamer_released.pt
+
+inference_args:
+    camera_mode: 4
+    cam_maxstep: 40
+    resolution_hw: [540, 960]
+    num_samples: 40
+    cam_ang: 72
 
 image_save_iter: 5000
 snapshot_save_epoch: 5
@@ -7,22 +14,40 @@ max_epoch: 400
 logging_iter: 10
 
 trainer:
-    type: imaginaire.trainers.lucidscenedreamer  # Changed to lucidscenedreamer
+    type: imaginaire.trainers.lucidscenedreamer # Changed trainer type
     model_average_config:
-        enabled: False  # Disable model averaging, at least initially
+        enabled: False
     amp_config:
-        enabled: True   # Keep AMP for efficiency
-    # Removed GAN-specific settings
+        enabled: False # Adjust as needed
+    perceptual_loss:
+        mode: "vgg19"
+        layers: ["relu_3_1", "relu_4_1", "relu_5_1"]
+        weights: [0.125, 0.25, 1.0]
+    loss_weight:
+        l2: 10.0
+        # gan: 0.5             # Commenting out GAN losses, using only SDS.
+        # pseudo_gan: 0.5
+        perceptual: 10.0
+        kl: 0.05
+        sds: 1.0 # Add SDS loss weight (TUNE THIS! Start low, e.g., 0.001)
+    init:
+        type: xavier
+        gain: 0.02
+
+    # SPADE/GauGAN model for pseudo-GT generation no longer needed,
+    # but include in case we decide we still want to use a bit of this
+    # as regularization
+    gaugan_loader:
+        config: configs/landscape1m.yaml
+
     image_to_tensorboard: True
     distributed_data_parallel_params:
         find_unused_parameters: False
         broadcast_buffers: False
-    # These are for the optimizer
-    gen_step: 1 #Only has gen update
 
 gen_opt:
     type: adam
-    lr: 0.0001  # You might need to tune this for SDS. Start lower.
+    lr: 0.0001 # You might need to tune this.  SDS can be sensitive.
     eps: 1.e-7
     adam_beta1: 0.
     adam_beta2: 0.999
@@ -31,90 +56,37 @@ gen_opt:
         type: step
         step_size: 400
         gamma: 0.1
-    #param_groups: # this can be removed since style and world encoder is removed
-     #   world_encoder:
-      #      lr: 0.0005
-       # hash_encoder:
-        #    lr: 0.0001
-        #render_net:
-         #   lr: 0.0001
-        #sky_net:
-         #   lr: 0.0001
-        #style_net:
-         #   lr: 0.0001
-        #style_encoder:
-         #   lr: 0.0001
-        #denoiser:
-         #   lr: 0.0001
+    param_groups:
+        world_encoder:
+            lr: 0.0005
+        hash_encoder:
+            lr: 0.0001
+        render_net:
+            lr: 0.0001
+        sky_net:
+            lr: 0.0001
+        style_net:
+            lr: 0.0001
+        style_encoder:
+            lr: 0.0001
+        denoiser:
+            lr: 0.0001
 
-#dis_opt: #removed since discriminator no longer in use
-
-# Data options.
-data:
-    type: imaginaire.datasets.paired_images
-    num_workers: 8
-    input_types:
-        - images:
-            ext: jpg
-            num_channels: 3
-            normalize: True
-            use_dont_care: False
-        - seg_maps:
-            ext: png
-            num_channels: 1
-            is_mask: True
-            normalize: False
-
-    full_data_ops: imaginaire.model_utils.label::make_one_hot, imaginaire.model_utils.label::concat_labels
-    use_dont_care: False
-    one_hot_num_classes:
-        seg_maps: 184
-    input_labels:
-        - seg_maps
-
-    # Which lmdb contains the ground truth image.
-    input_image:
-        - images
-
-    # Train dataset details.
-    train:
-        dataset_type: lmdb
-        # Input LMDBs.
-        roots:
-            - ./data/lhq_lmdb/train  # Keep this or change to your dataset
-        # Batch size per GPU.
-        batch_size: 1
-        # Data augmentations to be performed in given order.
-        augmentations:
-            resize_smallest_side: 256
-            # Rotate in (-rotate, rotate) in degrees.
-            rotate: 0
-            # Scale image by factor \in [1, 1+random_scale_limit].
-            random_scale_limit: 0.2
-            # Horizontal flip?
-            horizontal_flip: True
-            # Crop size.
-            random_crop_h_w: 256, 256  # Adjust as needed
-    # Train dataset details.
-    val:
-        dataset_type: lmdb
-        # Input LMDBs.
-        roots:
-            - ./data/lhq_lmdb/val  # Keep this or change to your dataset
-        # Batch size per GPU.
-        batch_size: 1
-        # Data augmentations to be performed in given order.
-        augmentations:
-            # Crop size.
-            resize_h_w: 256, 256  # Adjust as needed
-
-test_data:
-    type: imaginaire.datasets.dummy
-    num_workers: 0
+dis_opt:
+    type: adam
+    lr: 0.0004
+    eps: 1.e-7
+    adam_beta1: 0.
+    adam_beta2: 0.999
+    lr_policy:
+        iteration_mode: False
+        type: step
+        step_size: 400
+        gamma: 0.1
 
 gen:
-    type: imaginaire.generators.lucidscenedreamer  # Changed to lucidscenedreamer
-    pcg_dataset_path: ./data/terrain_cache  # Keep this, points to terrain data
+    type: imaginaire.generators.lucidscenedreamer # Changed generator type
+    pcg_dataset_path: ./data/terrain_cache
     pcg_cache: True
     scene_size: 2048
 
@@ -125,8 +97,8 @@ gen:
     pe_no_pe_feat_dim: 40
     pe_lvl_raydir: 0
     pe_incl_orig_raydir: False
-    # style_dims: 128  # Removed style_dims
-    # interm_style_dims: 256 # Removed interm_style_dims
+    style_dims: 128 # Set to 0 to disable style.
+    interm_style_dims: 256
     final_feat_dim: 64
 
     # Number of pixels removed from each edge to reduce boundary artifact of CNN
@@ -137,17 +109,17 @@ gen:
     pe_lvl_raydir_sky: 5
     pe_incl_orig_raydir_sky: True
 
-    # ======== Style Encoder =========  # Removed entire style encoder section
+    # ======== Style Encoder =========
     # Comment out to disable style encoder.
-    # style_enc:
-    #     num_filters: 64
-    #     kernel_size: 3
-    #     weight_norm_type: 'none'
+    # style_enc: # Removed
+    #   num_filters: 64
+    #   kernel_size: 3
+    #   weight_norm_type: 'none'
 
-    # stylenet_model: StyleMLP  # Removed stylenet_model
-    # stylenet_model_kwargs:  # Removed stylenet_model_kwargs
-    #     normalize_input: True
-    #     num_layers: 5
+    stylenet_model: StyleMLP # keeping this optional
+    stylenet_model_kwargs:
+        normalize_input: True
+        num_layers: 5
 
     mlp_model: RenderMLP
     mlp_model_kwargs:
@@ -172,28 +144,98 @@ gen:
     # ======== Label translator ========
     reduced_label_set: True
     use_label_smooth: True
-    # use_label_smooth_real: True # Removed as real data no longer in use
-    # use_label_smooth_pgt: True  # Removed as pgt no longer in use
+    use_label_smooth_real: True
+    use_label_smooth_pgt: True
     label_smooth_dia: 11
 
     # ======== Camera sampler ========
-    camera_sampler_type: 'traditional'
+    camera_sampler_type: "traditional"
     cam_res: [360, 640] # Camera resolution before cropping.
     crop_size: [256, 256] # Actual crop size is crop_size+pad. It should generally match random_crop_h_w in dataloader.
 
     # Threshold for rejecting camera poses that will result in a seg mask with low entropy.
     # Generally, 0.5 min, 0.8 max.
-    # camera_min_entropy: 0.75 # Removed
+    camera_min_entropy: 0.75
 
     # Threshold for rejecting camera poses that are too close to the objects.
-    # camera_rej_avg_depth: 2.0 # Removed
+    camera_rej_avg_depth: 2.0
 
-# Add the SDS loss configuration.  This is *crucial*.
+dis:
+    type: imaginaire.discriminators.gancraft
+    image_channels: 3
+    num_labels: 12 # Same as num_reduced_lbls.
+    use_label: True
+    num_filters: 128
+    fpse_kernel_size: 3
+    activation_norm_type: "none"
+    weight_norm_type: spectral
+    smooth_resample: True
+
+# Data options.
+data:
+    type: imaginaire.datasets.paired_images # Assuming paired images for initial testing.
+    num_workers: 8
+    input_types:
+        - images:
+              ext: jpg
+              num_channels: 3
+              normalize: True
+              use_dont_care: False
+        - seg_maps:
+              ext: png
+              num_channels: 1
+              is_mask: True
+              normalize: False
+
+    full_data_ops: imaginaire.model_utils.label::make_one_hot, imaginaire.model_utils.label::concat_labels
+    use_dont_care: False
+    one_hot_num_classes:
+        seg_maps: 184
+    input_labels:
+        - seg_maps
+
+    # Which lmdb contains the ground truth image.
+    input_image:
+        - images
+
+    # Train dataset details.
+    train:
+        dataset_type: lmdb
+        # Input LMDBs.
+        roots:
+            - ./data/lhq_lmdb/train #CHANGE THIS
+        # Batch size per GPU.
+        batch_size: 1
+        # Data augmentations to be performed in given order.
+        augmentations:
+            resize_smallest_side: 256
+            # Rotate in (-rotate, rotate) in degrees.
+            rotate: 0
+            # Scale image by factor \in [1, 1+random_scale_limit].
+            random_scale_limit: 0.2
+            # Horizontal flip?
+            horizontal_flip: True
+            # Crop size.
+            random_crop_h_w: 256, 256
+        # This is where we provide the text prompt:
+        prompt:
+            - "a beautiful landscape with a river and mountains"
+    # Train dataset details.
+    val:
+        dataset_type: lmdb
+        # Input LMDBs.
+        roots:
+            - ./data/lhq_lmdb/val #CHANGE THIS
+        # Batch size per GPU.
+        batch_size: 1
+        # Data augmentations to be performed in given order.
+        augmentations:
+            # Crop size.
+            resize_h_w: 256, 256
+
+test_data:
+    type: imaginaire.datasets.dummy
+    num_workers: 0
+
 sds_loss:
-  pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"  # ***CHANGE THIS*** to your actual path.
-  eta: 5000.0 # Initial loss weight.  This is VERY important to tune. Try values from 1 to 10000
-  text_prompt: "A magnificent castle in a lush forest." # example prompt
-
-trainer:
-  loss_weight:
-    sds: 5000.0 #tune as needed
+    pretrained_model_name_or_path: "./diffusion_models/stableDiffusion35_large.safetensors" # Add the path to your Stable Diffusion model here. e.g. "./stableDiffusion35_large.safetensors"

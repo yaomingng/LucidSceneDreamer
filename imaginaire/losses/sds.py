@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import StableDiffusionPipeline, DDIMScheduler
+from diffusers import StableDiffusionPipeline, DDIMScheduler  # Use Hugging Face Diffusers
 from safetensors.torch import load_file
 
 
@@ -14,7 +14,7 @@ class StableDiffusionWrapper(nn.Module):
 
     Args:
         pretrained_model_name_or_path (str): Path or name of the pretrained
-            Stable Diffusion model.
+            Stable Diffusion model (e.g., "runwayml/stable-diffusion-v1-5").
         device (str): Device to load the model onto ('cuda' or 'cpu').
         use_xformers (bool): If True, use xFormers memory-efficient attention.
     """
@@ -22,7 +22,8 @@ class StableDiffusionWrapper(nn.Module):
         super().__init__()
         self.device = device
 
-        # Load the Stable Diffusion pipeline. 
+        # Load the Stable Diffusion pipeline.  Crucially, we use the DDIMScheduler
+        # because it's deterministic (given a seed) and efficient for SDS.
         self.pipe = StableDiffusionPipeline.from_pretrained(pretrained_model_name_or_path,
                                                                 torch_dtype=torch.float16,
                                                                 safety_checker=None
@@ -56,8 +57,8 @@ class StableDiffusionWrapper(nn.Module):
             return_tensors="pt",
         )
         text_input_ids = text_inputs.input_ids.to(self.device)
-        # text_embeddings = self.pipe.text_encoder(text_input_ids)[0].detach().float() # would need float for older sd
-        text_embeddings = self.pipe.text_encoder(text_input_ids)[0] 
+        # text_embeddings = self.pipe.text_encoder(text_input_ids)[0].detach().float() #would need float for older sd
+        text_embeddings = self.pipe.text_encoder(text_input_ids)[0] #would need float for older sd
         return text_embeddings
 
     def predict_noise(self, noisy_image, text_embeddings, t):
@@ -76,7 +77,7 @@ class StableDiffusionWrapper(nn.Module):
             torch.Tensor: The predicted noise.  Shape matches noisy_image.
         """
 
-        # Concatenate the noisy image and the text embeddings. The order matters.
+        # Concatenate the noisy image and the text embeddings. The order matters!
         latents = torch.cat([noisy_image, text_embeddings], dim=1)
 
         # Predict the noise residual.
