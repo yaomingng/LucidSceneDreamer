@@ -1,12 +1,19 @@
+# Copyright (C) 2021 NVIDIA CORPORATION & AFFILIATES.  All rights reserved.
+#
+# This work is made available under the Nvidia Source Code License-NC.
+# To view a copy of this license, check out LICENSE.md
+import argparse
 import os
 import sys
 import random
-import argparse
+
 import torch
 import torch.nn as nn
 import torch.distributed as dist
 import torch.autograd.profiler as profiler
 import wandb
+
+import imaginaire.config
 from imaginaire.config import Config
 from imaginaire.utils.cudnn import init_cudnn
 from imaginaire.utils.dataset import get_train_and_val_dataloader
@@ -16,7 +23,6 @@ from imaginaire.utils.gpu_affinity import set_affinity
 from imaginaire.utils.logging import init_logging, make_logging_dir
 from imaginaire.utils.trainer import (get_model_optimizer_and_scheduler,
                                       get_trainer, set_random_seed)
-import imaginaire.config
 
 
 def parse_args():
@@ -56,6 +62,7 @@ def main():
     set_random_seed(args.seed, by_rank=True)
 
     cfg = Config(args.config)
+    # print('data cfg: ', cfg.data)
 
     # If single_gpu is set, disable distributed data parallel
     if args.single_gpu:
@@ -81,11 +88,10 @@ def main():
     init_cudnn(cfg.cudnn.deterministic, cfg.cudnn.benchmark)
 
     # Initialize data loaders and models.
-    batch_size = cfg.data.train.batch_size
-    total_step = max(1, cfg.trainer.gen_step)  # Only gen steps in LucidSceneDreamer.
-    cfg.data.train.batch_size *= total_step
+    # batch_size = cfg.data.train.batch_size # Batch size is now always 1
+    # total_step = max(1, cfg.trainer.gen_step)  # Only gen steps in LucidDreamer.
+    # cfg.data.train.batch_size *= total_step # Batch size is now always 1
     train_data_loader, val_data_loader = get_train_and_val_dataloader(cfg, args.seed)
-
     # Initialize only the generator; no discriminator for SDS-only training.
     net_G, _, opt_G, _, sch_G, _ = \
         get_model_optimizer_and_scheduler(cfg, seed=args.seed)
@@ -93,9 +99,8 @@ def main():
                           opt_G, None,
                           sch_G, None,
                           train_data_loader, val_data_loader)
-    resumed, current_epoch, current_iteration = trainer.load_checkpoint(
-        cfg, args.checkpoint, args.resume
-    )
+    resumed, current_epoch, current_iteration = trainer.load_checkpoint(cfg, args.checkpoint, args.resume)
+
 
     # Initialize Wandb.
     if is_master() and args.wandb:
@@ -132,7 +137,8 @@ def main():
                                   use_cuda=True,
                                   profile_memory=True,
                                   record_shapes=True) as prof:
-                data['prompt'] = cfg.data.train.prompt  # Add the prompt to the data dict.
+
+                data['prompt'] = cfg.data.train.prompt # adding the prompt here
                 data = trainer.start_of_iteration(data, current_iteration)
 
                 # for i in range(cfg.trainer.gen_step): # Only generator steps
@@ -151,7 +157,6 @@ def main():
             if args.profile:
                 print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=20))
                 prof.export_chrome_trace(os.path.join(cfg.logdir, "trace.json"))
-
         current_epoch += 1
         trainer.end_of_epoch(data, current_epoch, current_iteration)
 

@@ -5,7 +5,8 @@
 import torch
 
 from imaginaire.trainers.gancraft import Trainer as BaseTrainer
-from losses.sds import SDSLoss  # Import the SDS loss
+from imaginaire.losses.sds import SDSLoss  # Import the SDS loss
+
 
 class Trainer(BaseTrainer):
     r"""Initialize LucidDreamer trainer.
@@ -50,14 +51,15 @@ class Trainer(BaseTrainer):
 
     def _start_of_iteration(self, data, current_iteration):
         r"""Adds text embeddings to the data dictionary."""
-        data = super()._start_of_iteration(data, current_iteration)
+        # data = super()._start_of_iteration(data, current_iteration) # REMOVE THIS LINE
+        data = to_cuda(data) # We still need to move data to cuda.
         # if self.text_embedding_cache is None: # consider using a cached embedding
         with torch.no_grad():
             text_embeddings = self.sds_loss.diffusion_model.get_text_embedding(data['prompt'][0])
             #self.text_embedding_cache = text_embeddings # cache it
         # else:
         #     text_embeddings = self.text_embedding_cache
-        data['text_embeddings'] = text_embeddings.repeat(data['images'].shape[0], 1, 1)
+        data['text_embeddings'] = text_embeddings.repeat(data['voxel_id'].shape[0], 1, 1) # now gets the shape from voxel id instead of image
         return data
 
     def gen_forward(self, data):

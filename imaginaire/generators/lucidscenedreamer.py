@@ -100,14 +100,14 @@ class Generator(Base3DGenerator):
             device (torch.device): Device on which the tensors should be stored
         """
         with torch.no_grad():
-            self.voxel.sample_world(device)
+            self.voxel.sample_world(device)  # You might still want to sample the world.
             voxel_id_batch = []
             depth2_batch = []
             raydirs_batch = []
             cam_ori_t_batch = []
             for b in range(batch_size):
                 while True:  # Rejection sampling.
-                    # Sample camera pose.
+                    # Sample camera pose.  Keep this part, as it's independent of data.
                     if self.camera_sampler_type == 'random':
                         cam_res = self.cam_res
                         cam_ori_t, cam_dir_t, cam_up_t = camctl.rand_camera_pose_thridperson2(self.voxel)
@@ -137,26 +137,28 @@ class Generator(Base3DGenerator):
                         raise NotImplementedError(
                             'Unknown self.camera_sampler_type: {}'.format(self.camera_sampler_type))
 
-                    # Run ray-voxel intersection test
+                    # Run ray-voxel intersection test.  Keep this.
                     voxel_id, depth2, raydirs = voxlib.ray_voxel_intersection_perspective(
                         self.voxel.voxel_t, cam_ori_t, cam_dir_t, cam_up_t, cam_f, cam_c, cam_res_crop,
                         self.num_blocks_early_stop)
 
+                    # --- MODIFIED REJECTION SAMPLING ---
+                    # 1. Reject based on average depth (too close to objects).
                     if self.camera_rej_avg_depth > 0:
                         depth_map = depth2[0, :, :, 0, :]
                         avg_depth = torch.mean(depth_map[~torch.isnan(depth_map)])
                         if avg_depth < self.camera_rej_avg_depth:
-                            continue
+                            continue  # Reject and try again.
 
-                    # Reject low entropy.
-                    if self.camera_min_entropy > 0:
-                        # Check entropy.
-                        maskcnt = torch.bincount(
-                            torch.flatten(voxel_id[:, :, 0, 0]), weights=None, minlength=680).float() / \
-                                  (voxel_id.size(0) * voxel_id.size(1))
-                        maskentropy = -torch.sum(maskcnt * torch.log(maskcnt + 1e-10))
-                        if maskentropy < self.camera_min_entropy:
-                            continue
+                    # 2.  Reject based on the *proportion* of rays hitting empty space.
+                    #     This replaces the entropy check.
+                    num_rays = voxel_id.numel()
+                    num_empty_rays = (voxel_id == 0).sum()
+                    empty_ratio = num_empty_rays.float() / num_rays
+                    if empty_ratio > 0.9:  # Reject if > 90% of rays hit nothing.  Tune this threshold.
+                        continue
+
+                    # If we get here, the camera pose is acceptable.
                     break
 
                 voxel_id_batch.append(voxel_id)
@@ -167,17 +169,16 @@ class Generator(Base3DGenerator):
             depth2 = torch.stack(depth2_batch, dim=0)
             raydirs = torch.stack(raydirs_batch, dim=0)
             cam_ori_t = torch.stack(cam_ori_t_batch, dim=0).to(device)
-            cam_poses = None
-        return voxel_id, depth2, raydirs, cam_ori_t, cam_poses
+            cam_poses = None  # No longer needed.
+            return voxel_id, depth2, raydirs, cam_ori_t, cam_poses
 
     def sample_camera(self, data):
-        r"""Sample camera randomly and precompute everything used by both Gen and Dis.
-        This returns a dictionary of tensors that can be used to train both G and D.
+        r"""Sample camera randomly and precompute everything used by the generator.
 
         Args:
-            data (dict):
-                images (N x 3 x H x W tensor) : Real images
-                label (N x C2 x H x W tensor) : Segmentation map
+            data (dict): Input data dictionary.  This is largely unused now,
+                except for getting the batch size.
+
         Returns:
             ret (dict):
                 voxel_id (N x H x W x max_samples x 1 tensor): IDs of intersected tensors along each ray.
@@ -185,54 +186,16 @@ class Generator(Base3DGenerator):
                 intersection.
                 raydirs (N x H x W x 1 x 3 tensor): The direction of each ray.
                 cam_ori_t (N x 3 tensor): Camera origins.
-                real_masks (N x C3 x H x W tensor): One-hot segmentation map for real images, with translated labels.
-                fake_masks (N x C3 x H x W tensor): One-hot segmentation map for sampled camera views.
+                # --- Removed: real_masks and fake_masks ---
         """
         device = torch.device('cuda')
-        batch_size = data['images'].size(0)
+        batch_size = data['images'].size(0)  # Still need batch size.
         # ================ Assemble a batch ==================
         # Requires: voxel_id, depth2, raydirs, cam_ori_t.
         voxel_id, depth2, raydirs, cam_ori_t, _ = self._get_batch(batch_size, device)
         ret = {'voxel_id': voxel_id, 'depth2': depth2, 'raydirs': raydirs, 'cam_ori_t': cam_ori_t}
 
-        # =============== Mask translation ================
-        real_masks = data['label']
-        if self.reduced_label_set:
-            # Translate fake mask (directly from mcid).
-            # convert unrecognized labels to 'dirt'.
-            # N C H W [1 1 80 80]
-            reduce_fake_mask = self.label_trans.mc2reduced(
-                voxel_id[:, :, :, 0, :].permute(0, 3, 1, 2).long().contiguous()
-                , ign2dirt=True)
-            reduce_fake_mask_onehot = torch.zeros([
-                reduce_fake_mask.size(0), self.num_reduced_labels, reduce_fake_mask.size(2), reduce_fake_mask.size(3)],
-                dtype=torch.float, device=device)
-            reduce_fake_mask_onehot.scatter_(1, reduce_fake_mask, 1.0)
-            fake_masks = reduce_fake_mask_onehot
-            if self.pad != 0:
-                fake_masks = fake_masks[:, :, self.pad // 2:-self.pad // 2, self.pad // 2:-self.pad // 2]
-
-            # Translate real mask (data['label']), which is onehot.
-            real_masks_idx = torch.argmax(real_masks, dim=1, keepdim=True)
-            real_masks_idx[real_masks_idx > 182] = 182
-
-            reduced_real_mask = self.label_trans.coco2reduced(real_masks_idx)
-            reduced_real_mask_onehot = torch.zeros([
-                reduced_real_mask.size(0), self.num_reduced_labels, reduced_real_mask.size(2),
-                reduced_real_mask.size(3)], dtype=torch.float, device=device)
-            reduced_real_mask_onehot.scatter_(1, reduced_real_mask, 1.0)
-            real_masks = reduced_real_mask_onehot
-
-        # Mask smoothing.
-        if self.use_label_smooth:
-            fake_masks = mc_utils.segmask_smooth(fake_masks, kernel_size=self.label_smooth_dia)
-        if self.use_label_smooth_real:
-            real_masks = mc_utils.segmask_smooth(real_masks, kernel_size=self.label_smooth_dia)
-
-        ret['real_masks'] = real_masks
-        ret['fake_masks'] = fake_masks
-
-        return ret
+        return ret # No need to compute any masks.
 
     def _forward_perpix_sub(self, blk_feats, worldcoord2, raydirs_in, z, mc_masks_onehot=None, global_enc=None):
         r"""Per-pixel rendering forwarding
@@ -402,7 +365,7 @@ class Generator(Base3DGenerator):
         r"""GANcraft forward with additional text embeddings.
         """
         device = torch.device('cuda')
-        batch_size = data['images'].size(0)
+        batch_size = data['voxel_id'].size(0) # changed from image to voxel id
         # Requires: voxel_id, depth2, raydirs, cam_ori_t.
         voxel_id, depth2, raydirs, cam_ori_t = data['voxel_id'], data['depth2'], data['raydirs'], data['cam_ori_t']
 
