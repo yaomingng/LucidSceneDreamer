@@ -12,6 +12,7 @@ from imaginaire.config import Config
 from imaginaire.generators.lucidscenedreamer import Generator as LucidSceneDreamerGenerator
 from imaginaire.losses.sds import SDSLoss
 from imaginaire.utils.trainer import set_random_seed
+from imaginaire.utils.cudnn import init_cudnn
 
 # --- Configuration ---
 config_file = 'configs/lucidscenedreamer.yaml'  # Path to config file
@@ -25,6 +26,9 @@ if cfg.randomized_seed:
     set_random_seed(seed)
 else:
     set_random_seed(cfg.seed)
+
+# Initialize cudnn.
+init_cudnn(cfg.cudnn.deterministic, cfg.cudnn.benchmark)
 
 # --- Model Initialization ---
 # Load Pretrained SceneDreamer
