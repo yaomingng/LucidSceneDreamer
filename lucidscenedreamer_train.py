@@ -37,8 +37,16 @@ net_G = lib_G.Generator(cfg.gen).to(device)
 # Put the generator in training mode.
 net_G.train()
 
-checkpoint = torch.load(cfg.pretrained_weight, map_location='cpu')
-net_G.load_state_dict(checkpoint['net_G'])
+checkpoint = torch.load(cfg.pretrained_model, map_location='cpu')
+state_dict = checkpoint['net_G']
+
+# Remove the 'module.' prefix if present
+new_state_dict = {}
+for key, value in state_dict.items():
+    new_key = key[7:] if key.startswith('module.') else key  # strip 'module.' from key
+    new_state_dict[new_key] = value
+
+net_G.load_state_dict(new_state_dict)
 
 # Initialize SDS Loss and Text Encoder
 sds_loss_fn = SDSLoss(pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,

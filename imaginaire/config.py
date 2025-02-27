@@ -167,13 +167,21 @@ class Config(AttrDict):
                                                 batch_size=1))
 
 
-# Cudnn.
+        # Cudnn.
         self.cudnn = AttrDict(deterministic=False,
                               benchmark=True)
 
         # Others.
         self.pretrained_weight = ''
         self.inference_args = AttrDict()
+
+        # SDS.
+        self.pretrained_model = ''
+        self.randomized_seed = False
+        self.prompt = "A magical, glowing fairy forest, bioluminescent plants, soft light"
+        self.resume = False
+        self.seed = 0
+        self.outputdir = './outputs/lucidscenedreamer_train'
 
         # Update with given configurations.
         assert os.path.exists(filename), 'File {} not exist.'.format(filename)

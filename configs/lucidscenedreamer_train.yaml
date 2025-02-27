@@ -5,7 +5,7 @@ snapshot_save_iter: 1000
 output_dir: ./outputs/lucidscenedreamer_train
 resume: False
 prompt: "A magical, glowing fairy forest, bioluminescent plants, soft light"
-pretrained_weight: "./scenedreamer_models/scenedreamer_released.pt"
+pretrained_model: "./scenedreamer_models/scenedreamer_released.pt"
 randomised_seed: False
 seed: 2
 

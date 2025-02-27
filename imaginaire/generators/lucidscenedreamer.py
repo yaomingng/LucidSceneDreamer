@@ -21,7 +21,7 @@ class Generator(Base3DGenerator):
     """
 
     def __init__(self, gen_cfg):
-        super(Generator, self).__init__(gen_cfg)
+        super(Generator, self).__init__(gen_cfg, None)
         print('SceneDreamer[Hash] on ALL Scenes generator initialization.')
 
         # here should be a list of height maps and semantic maps

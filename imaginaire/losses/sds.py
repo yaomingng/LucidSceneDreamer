@@ -14,6 +14,8 @@ class SDSTextEncoder(nn.Module):
         for p in self.text_encoder.parameters():
             p.requires_grad = False
 
+        self.text_encoder = self.text_encoder.to("cuda")
+
     def forward(self, prompt):
         text_inputs = self.tokenizer(
             prompt,
@@ -22,7 +24,7 @@ class SDSTextEncoder(nn.Module):
             truncation=True,
             return_tensors="pt",
         )
-        text_input_ids = text_inputs.input_ids
+        text_input_ids = text_inputs.input_ids.to("cuda")
         if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
             removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
             print(
@@ -98,11 +100,11 @@ class SDSLoss(nn.Module):
         """
 
         if images.dtype != torch.float16:
-            images = images.half()  # Convert to fp16
+            images = images.to("cuda").half()  # Convert to fp16
 
         with torch.no_grad():
             # Sample a timestep t.
-            timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device=images.device, dtype=torch.long)
+            timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
 
             # Add noise to the images (forward diffusion process)
             noise = torch.randn_like(images)
