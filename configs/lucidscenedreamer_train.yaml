@@ -18,8 +18,8 @@ gen_opt:
 
 gen:
     type: imaginaire.generators.lucidscenedreamer
-    pcg_dataset_path: None
-    pcg_cache: False
+    pcg_dataset_path: ./data/terrain_cache
+    pcg_cache: True
     scene_size: 2048
 
     blk_feat_dim: 64

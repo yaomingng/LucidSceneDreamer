@@ -15,7 +15,7 @@ from imaginaire.utils.trainer import set_random_seed
 from imaginaire.utils.cudnn import init_cudnn
 
 # --- Configuration ---
-config_file = 'configs/lucidscenedreamer.yaml'  # Path to config file
+config_file = './configs/lucidscenedreamer.yaml'  # Path to config file
 cfg = Config(config_file)
 
 # --- Device Setup ---
