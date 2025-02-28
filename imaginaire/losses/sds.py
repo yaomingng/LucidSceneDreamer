@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import StableDiffusionPipeline, DDIMScheduler
+from diffusers import StableDiffusionPipeline, DDIMScheduler, AutoencoderKL
 from transformers import CLIPTextModel, CLIPTokenizer
 
 class SDSTextEncoder(nn.Module):
@@ -60,6 +60,15 @@ class SDSLoss(nn.Module):
         for p in self.unet.parameters():
             p.requires_grad = False
 
+        self.vae = AutoencoderKL.from_pretrained(
+            pretrained_model_name_or_path, subfolder="vae",
+            torch_dtype=torch.float16, 
+            revision="fp16"
+        ).to(self.device).to(torch.float16)
+        self.vae.eval()
+        for p in self.vae.parameters():
+            p.requires_grad = False
+
         self.reduction = reduction
         self.loss_scale = loss_scale
 
@@ -100,17 +109,21 @@ class SDSLoss(nn.Module):
         Returns:
             torch.Tensor: SDS loss value.
         """
-
-        if images.dtype != torch.float16:
-            images = images.to(self.device).half()  # Convert to fp16
+        # Image to latent
+        with torch.no_grad():
+            images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
+            images = images.float()  # Ensure float32 for VAE
+            latents = self.vae.encode(images).latent_dist.sample().detach()
+            latents = latents * 0.18215  # Scale by the VAE scaling factor
+            latents = latents.to(self.device).half()  # Convert to FP16
 
         with torch.no_grad():
             # Sample a timestep t.
             timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
 
             # Add noise to the images (forward diffusion process)
-            noise = torch.randn_like(images)
-            noisy_images = self.noise_scheduler.add_noise(images, noise, timesteps)
+            noise = torch.randn_like(latents)
+            noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
             
             # Get the predicted noise 
             latent_model_input = torch.cat([noisy_images] * 2)
@@ -125,8 +138,8 @@ class SDSLoss(nn.Module):
         grad = w * (noise_pred - noise)
 
         grad = torch.nan_to_num(grad)
-        target = (images - grad).detach()
-        loss = 0.5 * F.mse_loss(images, target, reduction='none') # Do *not* detach target!
+        target = (latents - grad).detach()
+        loss = 0.5 * F.mse_loss(latents, target, reduction='none') # Do *not* detach target!
         loss = loss.mean()
         
         return loss * self.loss_scale

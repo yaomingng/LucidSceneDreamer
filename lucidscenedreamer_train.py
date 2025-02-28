@@ -21,13 +21,14 @@ cfg = Config(config_file)
 # --- Device Setup ---
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+# --- Seed Initialization ---
 if cfg.randomized_seed:
     seed = random.randint(0, 10000)
     set_random_seed(seed)
 else:
     set_random_seed(cfg.seed)
 
-# Initialize cudnn.
+# --- Initialize cudnn ---
 init_cudnn(cfg.cudnn.deterministic, cfg.cudnn.benchmark)
 
 # --- Model Initialization ---
@@ -43,13 +44,13 @@ state_dict = checkpoint['net_G']
 # Remove the 'module.' prefix if present
 new_state_dict = {}
 for key, value in state_dict.items():
-    new_key = key[7:] if key.startswith('module.') else key  # strip 'module.' from key
+    new_key = key[7:] if key.startswith('module.') else key  
     new_state_dict[new_key] = value
 
 net_G.load_state_dict(new_state_dict)
 
-# Initialize SDS Loss and Text Encoder
-sds_loss_fn = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,
+# Initialize SDS Loss
+sds = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,
                       guidance_scale=cfg.trainer.sds.guidance_scale)
 
 # Optimizer Setup
@@ -70,7 +71,7 @@ params_to_optimize = [
 # Initialize the optimizer.
 optimizer = optim.Adam(params_to_optimize) 
 
-# --- Training Loop ---
+# --- Training Parameters ---
 num_iterations = cfg.max_iter             # Number of iterations to train for
 save_interval = cfg.snapshot_save_iter    # Save every 'save_interval' iterations
 log_interval = cfg.logging_iter           # Print loss every 'log_interval' iterations
@@ -93,9 +94,8 @@ if cfg.resume:
 
 # Get text prompt and encode it
 text_prompt = cfg.prompt
-text_embeddings = sds_loss_fn.get_text_embeddings([text_prompt], "")
+text_embeddings = sds.get_text_embeddings([text_prompt], "")
 
-# --- Training Loop ---
 # --- Voxel Grid Initialization ---
 if cfg.gen.pcg_cache:
     net_G.voxel.sample_world(device)  # For precomputed worlds
@@ -118,6 +118,7 @@ def save_image(image, output_dir, iteration):
     torchvision.utils.save_image(image, filepath)
     print(f"Saved image to {filepath}")
 
+# --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
 
     start_time = time.time()
@@ -127,7 +128,7 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
         image = net_G()['fake_images'] 
 
     # 2. Compute SDS Loss
-    loss = sds_loss_fn(image, text_embeddings, 1)
+    loss = sds(image, text_embeddings, 1)
 
     # 3. Backpropagation and Optimization
     optimizer.zero_grad()
