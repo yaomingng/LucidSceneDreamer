@@ -53,7 +53,7 @@ class SDSLoss(nn.Module):
         self.unet = StableDiffusionPipeline.from_pretrained(
             pretrained_model_name_or_path,
             torch_dtype=torch.float16,  
-            revision="fp16",
+            variant="fp16",
             safety_checker=None,
         ).unet.to(self.device).to(torch.float16)
         self.unet.eval()
@@ -63,7 +63,7 @@ class SDSLoss(nn.Module):
         self.vae = AutoencoderKL.from_pretrained(
             pretrained_model_name_or_path, subfolder="vae",
             torch_dtype=torch.float16, 
-            revision="fp16"
+            variant="fp16"
         ).to(self.device).to(torch.float16)
         self.vae.eval()
         for p in self.vae.parameters():
@@ -98,6 +98,10 @@ class SDSLoss(nn.Module):
 
         # Cat for CFG
         text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
+
+        # Convert to FP16
+        text_embeddings = text_embeddings.half()
+
         return text_embeddings
     
     def forward(self, images, text_embeddings, batch_size):
@@ -112,7 +116,7 @@ class SDSLoss(nn.Module):
         # Image to latent
         with torch.no_grad():
             images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
-            images = images.float()  # Ensure float32 for VAE
+            images = images.half()
             latents = self.vae.encode(images).latent_dist.sample().detach()
             latents = latents * 0.18215  # Scale by the VAE scaling factor
             latents = latents.to(self.device).half()  # Convert to FP16
