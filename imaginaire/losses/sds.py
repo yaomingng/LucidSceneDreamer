@@ -114,24 +114,23 @@ class SDSLoss(nn.Module):
             torch.Tensor: SDS loss value.
         """
         # Image to latent
-        with torch.no_grad():
-            images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
-            images = images.half()
-            latents = self.vae.encode(images).latent_dist.sample().detach()
-            latents = latents * 0.18215  # Scale by the VAE scaling factor
-            latents = latents.to(self.device).half()  # Convert to FP16
+        images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
+        images = images.half()
+        latents = self.vae.encode(images).latent_dist.sample()
+        latents = latents * 0.18215  # Scale by the VAE scaling factor
+        latents = latents.to(self.device).half()  # Convert to FP16
 
-        with torch.no_grad():
-            # Sample a timestep t.
-            timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
+        
+        # Sample a timestep t.
+        timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
 
-            # Add noise to the images (forward diffusion process)
-            noise = torch.randn_like(latents)
-            noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
+        # Add noise to the images (forward diffusion process)
+        noise = torch.randn_like(latents).half() 
+        noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
             
-            # Get the predicted noise 
-            latent_model_input = torch.cat([noisy_images] * 2)
-            noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample
+        # Get the predicted noise 
+        latent_model_input = torch.cat([noisy_images] * 2)
+        noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample.half() 
 
         # Classifier-free guidance:
         noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
@@ -139,11 +138,11 @@ class SDSLoss(nn.Module):
         
         #predict the 'foregound' and take the gradient on it as the SDS loss. (v-objective in ldm)
         w = (1 - self.noise_scheduler.alphas_cumprod[timesteps])
-        grad = w * (noise_pred - noise)
+        grad = w * (noise_pred - noise).half() 
 
         grad = torch.nan_to_num(grad)
-        target = (latents - grad).detach()
-        loss = 0.5 * F.mse_loss(latents, target, reduction='none') # Do *not* detach target!
+        target = (latents - grad).half() 
+        loss = 0.5 * F.mse_loss(latents, target, reduction='none').half()  
         loss = loss.mean()
         
         return loss * self.loss_scale
