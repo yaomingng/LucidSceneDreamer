@@ -49,7 +49,7 @@ for key, value in state_dict.items():
 net_G.load_state_dict(new_state_dict)
 
 # Initialize SDS Loss and Text Encoder
-sds_loss_fn = SDSLoss(pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,
+sds_loss_fn = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,
                       guidance_scale=cfg.trainer.sds.guidance_scale)
 
 # Optimizer Setup

@@ -6,7 +6,7 @@ from transformers import CLIPTextModel, CLIPTokenizer
 
 class SDSTextEncoder(nn.Module):
     """Wrapper for the Stable Diffusion text encoder."""
-    def __init__(self, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base"):
+    def __init__(self, device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base"):
         super().__init__()
         self.tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="tokenizer")
         self.text_encoder = CLIPTextModel.from_pretrained(pretrained_model_name_or_path, subfolder="text_encoder")
@@ -14,7 +14,8 @@ class SDSTextEncoder(nn.Module):
         for p in self.text_encoder.parameters():
             p.requires_grad = False
 
-        self.text_encoder = self.text_encoder.to("cuda")
+        self.device = device
+        self.text_encoder = self.text_encoder.to(self.device)
 
     def forward(self, prompt):
         text_inputs = self.tokenizer(
@@ -24,7 +25,7 @@ class SDSTextEncoder(nn.Module):
             truncation=True,
             return_tensors="pt",
         )
-        text_input_ids = text_inputs.input_ids.to("cuda")
+        text_input_ids = text_inputs.input_ids.to(self.device)
         if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
             removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
             print(
@@ -37,13 +38,14 @@ class SDSTextEncoder(nn.Module):
 
 
 class SDSLoss(nn.Module):
-    def __init__(self, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base",
+    def __init__(self, device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base",
                  guidance_scale=7.5, reduction='mean', loss_scale=1.0, t_min=0.02, t_max=0.98):
         super().__init__()
 
         self.guidance_scale = guidance_scale
         self.pretrained_model_name_or_path = pretrained_model_name_or_path
-        self.text_encoder = SDSTextEncoder(pretrained_model_name_or_path)
+        self.text_encoder = SDSTextEncoder(device, pretrained_model_name_or_path)
+        self.device = device
 
         # Use DDIM scheduler for faster sampling 
         self.noise_scheduler = DDIMScheduler.from_pretrained(pretrained_model_name_or_path, subfolder="scheduler")
@@ -53,7 +55,7 @@ class SDSLoss(nn.Module):
             torch_dtype=torch.float16,  
             revision="fp16",
             safety_checker=None,
-        ).unet.to("cuda").to(torch.float16)
+        ).unet.to(self.device).to(torch.float16)
         self.unet.eval()
         for p in self.unet.parameters():
             p.requires_grad = False
@@ -73,7 +75,7 @@ class SDSLoss(nn.Module):
             max_length=self.text_encoder.tokenizer.model_max_length,
             return_tensors="pt",
         )
-        text_embeddings = self.text_encoder.text_encoder(text_input.input_ids.to("cuda"))[0]
+        text_embeddings = self.text_encoder.text_encoder(text_input.input_ids.to(self.device))[0]
 
         # unconditional embeddings
         uncond_input = self.text_encoder.tokenizer(
@@ -83,7 +85,7 @@ class SDSLoss(nn.Module):
             return_tensors="pt",
         )
         with torch.no_grad():
-            uncond_embeddings = self.text_encoder.text_encoder(uncond_input.input_ids.to("cuda"))[0]
+            uncond_embeddings = self.text_encoder.text_encoder(uncond_input.input_ids.to(self.device))[0]
 
         # Cat for CFG
         text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
@@ -100,7 +102,7 @@ class SDSLoss(nn.Module):
         """
 
         if images.dtype != torch.float16:
-            images = images.to("cuda").half()  # Convert to fp16
+            images = images.to(self.device).half()  # Convert to fp16
 
         with torch.no_grad():
             # Sample a timestep t.
