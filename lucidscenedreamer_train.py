@@ -56,7 +56,7 @@ sds = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_m
 # Optimizer Setup
 # --- Parameter Freezing ---
 for name, param in net_G.named_parameters():
-    if 'hash_encoder' in name or 'world_encoder' in name:
+    if 'render_net' in name or 'world_encoder' in name:
         param.requires_grad = True  # These we want to optimize
         print(f"Parameters of {name} will be optimized.")
     else:
@@ -65,7 +65,7 @@ for name, param in net_G.named_parameters():
 
 params_to_optimize = [
     {'params': net_G.world_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['world_encoder']['lr']},  
-    {'params': net_G.hash_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['hash_encoder']['lr']},   
+    {'params': net_G.render_net.parameters(), 'lr': cfg.gen_opt.param_groups['render_net']['lr']},   
 ]
 
 # Initialize the optimizer.
@@ -124,8 +124,7 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     start_time = time.time()
 
     # 1. Sample Camera and Render
-    with torch.no_grad():
-        image = net_G()['fake_images'] 
+    image = net_G()['fake_images'] 
 
     # 2. Compute SDS Loss
     loss = sds(image, text_embeddings, 1)
