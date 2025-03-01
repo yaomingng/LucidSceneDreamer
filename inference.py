@@ -55,6 +55,10 @@ def main():
     # Load checkpoint.
     # trainer.load_checkpoint(cfg, args.checkpoint)
     checkpoint = torch.load(args.checkpoint, map_location='cpu')
+
+    # Add the 'module.' prefix to each key in the net_G state dictionary
+    checkpoint['net_G'] = {f'module.{k}': v for k, v in checkpoint['net_G'].items()}
+
     net_G.load_state_dict(checkpoint['net_G'])
 
     # Do inference.

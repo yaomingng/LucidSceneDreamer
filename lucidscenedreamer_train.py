@@ -120,6 +120,7 @@ def save_image(image, output_dir, iteration):
 
 # --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
+    torch.cuda.empty_cache()
 
     start_time = time.time()
 
