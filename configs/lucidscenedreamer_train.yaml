@@ -12,9 +12,9 @@ seed: 2
 gen_opt:
     param_groups:
         world_encoder:
-            lr: 0.0001
+            lr: 0.000001
         hash_encoder:
-            lr: 0.0001
+            lr: 0.000001
 
 gen:
     type: imaginaire.generators.lucidscenedreamer

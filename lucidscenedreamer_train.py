@@ -138,15 +138,14 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     # --- Logging and Checkpointing ---
     if iteration % log_interval == 0:
         log_message = f"Iteration {iteration}: SDS Loss = {loss.item()}, Time = {end_time - start_time:.4f}s"
-        tqdm.write(log_message)
-
+        
         # Save log to a text file
         log_file_path = os.path.join(output_dir, "training_log.txt")
         with open(log_file_path, "a") as log_file:
             log_file.write(log_message + "\n")  # Add a newline for each entry
 
     # Save a checkpoint every 20 iteration to avoid losing progress
-    if iteration % 20 == 0:
+    if iteration % 100 == 0:
         latest_checkpoint_path = os.path.join(output_dir, "latest_checkpoint.pt")
 
         # Delete the old checkpoint file if it exists
