@@ -145,26 +145,33 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
         with open(log_file_path, "a") as log_file:
             log_file.write(log_message + "\n")  # Add a newline for each entry
 
-    # Save a checkpoint every iteration (overwriting the previous one)
-    latest_checkpoint_path = os.path.join(output_dir, "latest_checkpoint.pt")
-    torch.save({
-        'net_G': net_G.state_dict(),
-        'optimizer': optimizer.state_dict(),
-        'iteration': iteration 
-    }, latest_checkpoint_path)
+    # Save a checkpoint every 20 iteration to avoid losing progress
+    if iteration % 20 == 0:
+        latest_checkpoint_path = os.path.join(output_dir, "latest_checkpoint.pt")
+
+        # Delete the old checkpoint file if it exists
+        if os.path.exists(latest_checkpoint_path):
+            os.remove(latest_checkpoint_path)
+
+        torch.save({
+            'net_G': net_G.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'iteration': iteration 
+        }, latest_checkpoint_path)
 
     if iteration % save_interval == 0 and iteration > 0:
-        output_path = os.path.join(output_dir, f"checkpoint_{iteration}.pt")
-
         # Create the 'checkpoints' subdirectory if it doesn't exist
         checkpoint_path = os.path.join(output_dir, "checkpoints")
         os.makedirs(checkpoint_path, exist_ok=True)  
+
+        # Define the output file path
+        output_path = os.path.join(checkpoint_path, f"checkpoint_{iteration}.pt")
         
         torch.save({
             'net_G': net_G.state_dict(),
             'optimizer': optimizer.state_dict(),
             'iteration': iteration 
-        }, checkpoint_path)
+        }, output_path)
 
     # --- Image Saving ---
     if iteration % image_save_interval == 0:
