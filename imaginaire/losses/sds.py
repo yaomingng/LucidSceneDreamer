@@ -120,7 +120,6 @@ class SDSLoss(nn.Module):
         latents = latents * 0.18215  # Scale by the VAE scaling factor
         latents = latents.to(self.device).half()  # Convert to FP16
 
-        
         # Sample a timestep t.
         timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
 

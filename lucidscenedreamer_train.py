@@ -79,7 +79,7 @@ log_interval = cfg.logging_iter           # Print loss every 'log_interval' iter
 image_save_interval = cfg.image_save_iter # save image every 'image_save_interval' iterations
 output_dir = cfg.outputdir
 os.makedirs(output_dir, exist_ok=True)    # create output directory
-starting_iter = 0                         # for resuming
+starting_iter = 1                         # for resuming
 
 # --- Checkpoint Loading (for resuming) ---
 if cfg.resume:
@@ -115,9 +115,8 @@ def save_image(image, output_dir, iteration):
     images_dir = os.path.join(output_dir, "generated_images")
     os.makedirs(images_dir, exist_ok=True)  
 
-    filepath = os.path.join(images_dir, f"image_{iteration:06d}.png")
+    filepath = os.path.join(images_dir, f"image_{iteration}.png")
     torchvision.utils.save_image(image, filepath)
-    print(f"Saved image to {filepath}")
 
 # --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
@@ -166,7 +165,6 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
             'optimizer': optimizer.state_dict(),
             'iteration': iteration 
         }, checkpoint_path)
-        print(f"Checkpoint saved to {checkpoint_path}")
 
     # --- Image Saving ---
     if iteration % image_save_interval == 0:
