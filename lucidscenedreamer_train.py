@@ -3,6 +3,7 @@ import torch.optim as optim
 import torchvision
 from tqdm import tqdm
 import os
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 import time
 import importlib
 import random
@@ -120,8 +121,6 @@ def save_image(image, output_dir, iteration):
 
 # --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
-    torch.cuda.empty_cache()
-
     start_time = time.time()
 
     # 1. Sample Camera and Render
@@ -172,5 +171,7 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     # --- Image Saving ---
     if iteration % image_save_interval == 0:
         save_image(image, output_dir, iteration)
+
+    torch.cuda.empty_cache()
 
 print("Training Done!")
