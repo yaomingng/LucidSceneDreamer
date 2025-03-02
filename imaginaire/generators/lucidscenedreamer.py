@@ -62,7 +62,7 @@ class Generator(Base3DGenerator):
             device (torch.device): Device on which the tensors should be stored
         """
         with torch.no_grad():
-            #self.voxel.sample_world(device)
+            self.voxel.sample_world(device)
             voxel_id_batch = []
             depth2_batch = []
             raydirs_batch = []

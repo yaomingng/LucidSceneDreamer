@@ -84,6 +84,9 @@ params_to_optimize = [
 # Initialize the optimizer.
 optimizer = optim.Adam(params_to_optimize) 
 
+# Learning Rate Scheduler
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
+
 # --- Training Parameters ---
 num_iterations = cfg.max_iter             # Number of iterations to train for
 save_interval = cfg.snapshot_save_iter    # Save every 'save_interval' iterations
@@ -110,12 +113,8 @@ text_prompt = cfg.prompt
 text_embeddings = sds.get_text_embeddings([text_prompt], "")
 
 # --- Voxel Grid Initialization ---
-if cfg.gen.pcg_cache:
-    net_G.voxel.sample_world(device)  # For precomputed worlds
-else:
-    world_dir = os.path.join(output_dir, 'world')
-    os.makedirs(world_dir, exist_ok=True)
-    net_G.voxel.next_world(device, world_dir, checkpoint)  # For procedural generation
+# if cfg.gen.pcg_cache:
+#     net_G.voxel.sample_world(device)  # For precomputed worlds
 
 # --- Helper function to save images ---
 def save_image(image, output_dir, iteration):
@@ -144,6 +143,7 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    scheduler.step()
 
     end_time = time.time()
 

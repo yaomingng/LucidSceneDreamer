@@ -84,7 +84,8 @@ class SDSLoss(nn.Module):
             max_length=self.text_encoder.tokenizer.model_max_length,
             return_tensors="pt",
         )
-        text_embeddings = self.text_encoder.text_encoder(text_input.input_ids.to(self.device))[0]
+        with torch.no_grad():
+            text_embeddings = self.text_encoder.text_encoder(text_input.input_ids.to(self.device))[0]
 
         # unconditional embeddings
         uncond_input = self.text_encoder.tokenizer(
@@ -124,12 +125,13 @@ class SDSLoss(nn.Module):
         timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
 
         # Add noise to the images (forward diffusion process)
-        noise = torch.randn_like(latents).half() 
+        noise = torch.randn_like(latents, dtype=torch.float16)
         noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
             
         # Get the predicted noise 
-        latent_model_input = torch.cat([noisy_images] * 2)
-        noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample.half() 
+        with torch.no_grad():
+            latent_model_input = torch.cat([noisy_images] * 2)
+            noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample.half() 
 
         # Classifier-free guidance:
         noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
