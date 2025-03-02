@@ -56,8 +56,16 @@ sds = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_m
 
 # Optimizer Setup
 # --- Parameter Freezing ---
+# --- Parameter Freezing ---
 for name, param in net_G.named_parameters():
-    if 'hash_encoder' in name or 'world_encoder' in name:
+    if (
+        'hash_encoder' in name or 
+        'world_encoder' in name or 
+        'render_net' in name or 
+        'sky_net' in name or 
+        'style_net' in name or 
+        'style_encoder' in name
+    ):
         param.requires_grad = True  # These we want to optimize
         print(f"Parameters of {name} will be optimized.")
     else:
@@ -66,8 +74,15 @@ for name, param in net_G.named_parameters():
 
 params_to_optimize = [
     {'params': net_G.world_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['world_encoder']['lr']},  
-    {'params': net_G.hash_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['hash_encoder']['lr']},   
+    {'params': net_G.hash_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['hash_encoder']['lr']},  
+    {'params': net_G.render_net.parameters(), 'lr': cfg.gen_opt.param_groups['render_net']['lr']}, 
+    {'params': net_G.sky_net.parameters(), 'lr': cfg.gen_opt.param_groups['sky_net']['lr']},  
+    {'params': net_G.style_net.parameters(), 'lr': cfg.gen_opt.param_groups['style_net']['lr']},  
+    {'params': net_G.style_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['style_encoder']['lr']},  
 ]
+
+# Initialize the optimizer.
+optimizer = optim.Adam(params_to_optimize)
 
 # Initialize the optimizer.
 optimizer = optim.Adam(params_to_optimize) 
