@@ -112,10 +112,6 @@ if cfg.resume:
 text_prompt = cfg.prompt
 text_embeddings = sds.get_text_embeddings([text_prompt], "")
 
-# --- Voxel Grid Initialization ---
-# if cfg.gen.pcg_cache:
-#     net_G.voxel.sample_world(device)  # For precomputed worlds
-
 # --- Helper function to save images ---
 def save_image(image, output_dir, iteration):
     """Saves a generated image."""
