@@ -82,9 +82,6 @@ params_to_optimize = [
 ]
 
 # Initialize the optimizer.
-optimizer = optim.Adam(params_to_optimize)
-
-# Initialize the optimizer.
 optimizer = optim.Adam(params_to_optimize) 
 
 # --- Training Parameters ---
