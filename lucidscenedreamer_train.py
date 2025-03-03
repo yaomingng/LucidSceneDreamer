@@ -125,6 +125,8 @@ def save_image(image, output_dir, iteration):
     filepath = os.path.join(images_dir, f"image_{iteration}.png")
     torchvision.utils.save_image(image, filepath)
 
+scaler = torch.cuda.amp.GradScaler()
+
 # --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     start_time = time.time()
@@ -137,8 +139,9 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
 
     # 3. Backpropagation and Optimization
     optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
+    scaler.scale(loss).backward() 
+    scaler.step(optimizer)  
+    scaler.update() 
     scheduler.step()
 
     end_time = time.time()

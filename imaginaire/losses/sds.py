@@ -52,19 +52,15 @@ class SDSLoss(nn.Module):
 
         self.unet = StableDiffusionPipeline.from_pretrained(
             pretrained_model_name_or_path,
-            torch_dtype=torch.float16,  
-            variant="fp16",
             safety_checker=None,
-        ).unet.to(self.device).to(torch.float16)
+        ).unet.to(self.device)
         self.unet.eval()
         for p in self.unet.parameters():
             p.requires_grad = False
 
         self.vae = AutoencoderKL.from_pretrained(
             pretrained_model_name_or_path, subfolder="vae",
-            torch_dtype=torch.float16, 
-            variant="fp16"
-        ).to(self.device).to(torch.float16)
+        ).to(self.device)
         self.vae.eval()
         for p in self.vae.parameters():
             p.requires_grad = False
@@ -114,36 +110,36 @@ class SDSLoss(nn.Module):
         Returns:
             torch.Tensor: SDS loss value.
         """
-        # Image to latent
-        images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
-        images = images.half()
-        latents = self.vae.encode(images).latent_dist.sample()
-        latents = latents * 0.18215  # Scale by the VAE scaling factor
-        latents = latents.to(self.device).half()  # Convert to FP16
+        with torch.amp.autocast('cuda', enabled=True):
+            # Image to latent
+            images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
+            latents = self.vae.encode(images).latent_dist.sample()
+            latents = latents * 0.18215  # Scale by the VAE scaling factor
+            latents = latents.to(self.device)
 
-        # Sample a timestep t.
-        timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
+            # Sample a timestep t.
+            timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
 
-        # Add noise to the images (forward diffusion process)
-        noise = torch.randn_like(latents, dtype=torch.float16)
-        noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
+            # Add noise to the images (forward diffusion process)
+            noise = torch.randn_like(latents)
+            noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
+                
+            # Get the predicted noise 
+            with torch.no_grad():
+                latent_model_input = torch.cat([noisy_images] * 2)
+                noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample
+
+            # Classifier-free guidance:
+            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
             
-        # Get the predicted noise 
-        with torch.no_grad():
-            latent_model_input = torch.cat([noisy_images] * 2)
-            noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample.half() 
+            #predict the 'foregound' and take the gradient on it as the SDS loss. (v-objective in ldm)
+            w = (1 - self.noise_scheduler.alphas_cumprod[timesteps])
+            grad = w[:, None, None, None] * (noise_pred - noise)
 
-        # Classifier-free guidance:
-        noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
-        
-        #predict the 'foregound' and take the gradient on it as the SDS loss. (v-objective in ldm)
-        w = (1 - self.noise_scheduler.alphas_cumprod[timesteps])
-        grad = w * (noise_pred - noise).half() 
-
-        grad = torch.nan_to_num(grad)
-        target = (latents - grad).half() 
-        loss = 0.5 * F.mse_loss(latents, target, reduction='none').half()  
-        loss = loss.mean()
-        
+            grad = torch.nan_to_num(grad)
+            target = (latents - grad)
+            loss = 0.5 * F.mse_loss(latents, target, reduction='none') 
+            loss = loss.mean()
+            
         return loss * self.loss_scale
