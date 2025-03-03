@@ -125,7 +125,7 @@ def save_image(image, output_dir, iteration):
     filepath = os.path.join(images_dir, f"image_{iteration}.png")
     torchvision.utils.save_image(image, filepath)
 
-scaler = torch.cuda.amp.GradScaler()
+scaler = torch.amp.GradScaler('cuda')
 
 # --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
