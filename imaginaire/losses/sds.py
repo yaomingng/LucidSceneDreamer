@@ -125,9 +125,8 @@ class SDSLoss(nn.Module):
             noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
                 
             # Get the predicted noise 
-            with torch.no_grad():
-                latent_model_input = torch.cat([noisy_images] * 2)
-                noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample
+            latent_model_input = torch.cat([noisy_images] * 2)
+            noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample
 
             # Classifier-free guidance:
             noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
