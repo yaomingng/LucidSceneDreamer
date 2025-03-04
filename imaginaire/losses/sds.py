@@ -96,9 +96,6 @@ class SDSLoss(nn.Module):
         # Cat for CFG
         text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
 
-        # Convert to FP16
-        text_embeddings = text_embeddings.half()
-
         return text_embeddings
     
     def forward(self, images, text_embeddings, batch_size):
