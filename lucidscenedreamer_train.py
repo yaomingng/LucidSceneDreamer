@@ -155,7 +155,7 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
         with open(log_file_path, "a") as log_file:
             log_file.write(log_message + "\n")  # Add a newline for each entry
 
-    # Save a checkpoint every 20 iteration to avoid losing progress
+    # Save a checkpoint every 100 iteration to avoid losing progress
     if iteration % 100 == 0:
         latest_checkpoint_path = os.path.join(output_dir, "latest_checkpoint.pt")
 
