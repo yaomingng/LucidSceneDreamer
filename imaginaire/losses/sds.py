@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from diffusers import StableDiffusionPipeline, DDIMScheduler, AutoencoderKL
 from transformers import CLIPTextModel, CLIPTokenizer
 
+
 class SDSTextEncoder(nn.Module):
     """Wrapper for the Stable Diffusion text encoder."""
     def __init__(self, device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base"):
@@ -75,11 +76,11 @@ class SDSLoss(nn.Module):
 
         # Get embeddings for the prompt
         with torch.no_grad():
-            text_embeddings = self.forward(prompt)
+            text_embeddings = self.text_encoder(prompt)
 
         # Get embeddings for the negative prompt
         with torch.no_grad():
-            uncond_embeddings = self.forward([negative_prompt] * len(prompt))
+            uncond_embeddings = self.text_encoder([negative_prompt] * len(prompt))
 
         # Concatenate for CFG
         text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
