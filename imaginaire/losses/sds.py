@@ -73,27 +73,15 @@ class SDSLoss(nn.Module):
 
     def get_text_embeddings(self, prompt, negative_prompt=""):
 
-        # text embeddings
-        text_input = self.text_encoder.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.text_encoder.tokenizer.model_max_length,
-            return_tensors="pt",
-        )
+        # Get embeddings for the prompt
         with torch.no_grad():
-            text_embeddings = self.text_encoder.text_encoder(text_input.input_ids.to(self.device))[0]
+            text_embeddings = self.forward(prompt)
 
-        # unconditional embeddings
-        uncond_input = self.text_encoder.tokenizer(
-            [negative_prompt] * (len(prompt)),  # Ensure correct batch size for uncond
-            padding="max_length",
-            max_length=self.text_encoder.tokenizer.model_max_length,
-            return_tensors="pt",
-        )
+        # Get embeddings for the negative prompt
         with torch.no_grad():
-            uncond_embeddings = self.text_encoder.text_encoder(uncond_input.input_ids.to(self.device))[0]
+            uncond_embeddings = self.forward([negative_prompt] * len(prompt))
 
-        # Cat for CFG
+        # Concatenate for CFG
         text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
 
         return text_embeddings
