@@ -13,15 +13,9 @@ gen_opt:
     param_groups:
         world_encoder:
             lr: 0.0001
-        hash_encoder:
-            lr: 0.0001
-        render_net:
-            lr: 0.0001
         sky_net:
             lr: 0.0001
         style_net:
-            lr: 0.0001
-        style_encoder:
             lr: 0.0001
 
 gen:
