@@ -13,6 +13,7 @@ from encoding import get_encoder
 
 from imaginaire.model_utils.layers import LightningMLP, ConditionalHashGrid
 
+
 class Generator(Base3DGenerator):
     r"""LucidSceneDreamer generator constructor.
 
