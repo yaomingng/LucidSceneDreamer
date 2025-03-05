@@ -47,8 +47,8 @@ def copy_tree_assets(checkpoint_path, asset_path, output_path):
         print(f"Error saving checkpoint: {e}")
 
 if __name__ == '__main__':
-    checkpoint_path = "../outputs/lucidscenedreamer_train/latest_checkpoint.pt"  
-    asset_path = "../scenedreamer_models/scenedreamer_released.pt" 
-    output_path = "../outputs/lucidscenedreamer_train/checkpoints/modified_checkpoint.pt"  
+    checkpoint_path = "./outputs/lucidscenedreamer_train/latest_checkpoint.pt"  
+    asset_path = "./scenedreamer_models/scenedreamer_released.pt" 
+    output_path = "./outputs/lucidscenedreamer_train/checkpoints/modified_checkpoint.pt"  
 
     copy_tree_assets(checkpoint_path, asset_path, output_path)
