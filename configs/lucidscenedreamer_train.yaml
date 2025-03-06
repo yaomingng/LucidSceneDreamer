@@ -1,25 +1,19 @@
 max_iter: 10001
 image_save_iter: 100
 logging_iter: 100
-snapshot_save_iter: 1000
+snapshot_save_iter: 10000
 output_dir: ./outputs/lucidscenedreamer_train
 resume: False
-prompt: "A futuristic cyberpunk cityscape with towering reflective glass skyscrapers, glowing neon signs in hot pink and electric blue, and a dense fog diffusing light into vibrant halos. The streets are slick with rain, reflecting neon colors, while holographic advertisements float in the air, creating a chaotic yet mesmerizing atmosphere."
+prompt: "Van Gogh Paint"
 pretrained_model: "./scenedreamer_models/scenedreamer_released.pt"
 randomised_seed: False
 seed: 2
 
 gen_opt:
     param_groups:
-        hash_encoder:
-            lr: 0.0001
-        render_net:
-            lr: 0.0001
         sky_net:
             lr: 0.0001
         style_net:
-            lr: 0.0001
-        denoiser:
             lr: 0.0001
 
 gen:
@@ -97,4 +91,4 @@ gen:
 trainer:
     sds:
         pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-        guidance_scale: 15
+        guidance_scale: 100
