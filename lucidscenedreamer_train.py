@@ -1,13 +1,12 @@
 import torch
+import torch.optim as optim
 import torchvision
-from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 import time
 import importlib
 import random
-import math
 
 # Import necessary components 
 from imaginaire.config import Config
@@ -55,18 +54,6 @@ net_G.load_state_dict(new_state_dict)
 sds = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,
                       guidance_scale=cfg.trainer.sds.guidance_scale)
 
-# --- Training Parameters ---
-num_iterations = cfg.max_iter             # Number of iterations to train for
-save_interval = cfg.snapshot_save_iter    # Save every 'save_interval' iterations
-log_interval = cfg.logging_iter           # Print loss every 'log_interval' iterations
-image_save_interval = cfg.image_save_iter # save image every 'image_save_interval' iterations
-output_dir = cfg.outputdir
-os.makedirs(output_dir, exist_ok=True)    # create output directory
-starting_iter = 1                         # for resuming
-# Create the 'checkpoints' subdirectory if it doesn't exist
-checkpoint_path = os.path.join(output_dir, "checkpoints")
-os.makedirs(checkpoint_path, exist_ok=True)  
-
 # Optimizer Setup
 # --- Parameter Freezing ---
 # --- Parameter Freezing ---
@@ -86,20 +73,23 @@ params_to_optimize = [
     {'params': net_G.style_net.parameters(), 'lr': cfg.gen_opt.param_groups['style_net']['lr']}
 ]
 
-def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, num_cycles: float = 0.5):
-    def lr_lambda(current_step):
-        if current_step < num_warmup_steps:
-            return float(current_step) / float(max(1, num_warmup_steps))
-        progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
-        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
-
-    return LambdaLR(optimizer, lr_lambda, -1)
-
 # Initialize the optimizer.
-optimizer = torch.optim.AdamW(params_to_optimize, weight_decay=0)
+optimizer = optim.Adam(params_to_optimize) 
 
 # Learning Rate Scheduler
-scheduler = get_cosine_schedule_with_warmup(optimizer, 100, int((num_iterations-1)*1.5))
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
+
+# --- Training Parameters ---
+num_iterations = cfg.max_iter             # Number of iterations to train for
+save_interval = cfg.snapshot_save_iter    # Save every 'save_interval' iterations
+log_interval = cfg.logging_iter           # Print loss every 'log_interval' iterations
+image_save_interval = cfg.image_save_iter # save image every 'image_save_interval' iterations
+output_dir = cfg.outputdir
+os.makedirs(output_dir, exist_ok=True)    # create output directory
+starting_iter = 1                         # for resuming
+# Create the 'checkpoints' subdirectory if it doesn't exist
+checkpoint_path = os.path.join(output_dir, "checkpoints")
+os.makedirs(checkpoint_path, exist_ok=True)  
 
 # --- Checkpoint Loading (for resuming) ---
 if cfg.resume:
