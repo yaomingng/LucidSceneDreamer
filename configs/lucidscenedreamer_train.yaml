@@ -1,6 +1,6 @@
-max_iter: 10001
-image_save_iter: 200
-logging_iter: 200
+max_iter: 50001
+image_save_iter: 500
+logging_iter: 1000
 snapshot_save_iter: 100000
 output_dir: ./outputs/lucidscenedreamer_train
 resume: False

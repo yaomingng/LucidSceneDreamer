@@ -89,7 +89,7 @@ params_to_optimize = [
 optimizer = optim.Adam(params_to_optimize) 
 
 # Learning Rate Scheduler
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=num_iterations, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
 
 # --- Checkpoint Loading (for resuming) ---
 if cfg.resume:
