@@ -178,7 +178,8 @@ class Config(AttrDict):
         # SDS.
         self.pretrained_model = ''
         self.randomized_seed = False
-        self.prompt = "A magical, glowing fairy forest, bioluminescent plants, soft light"
+        self.prompt = "Van Gogh Painting"
+        self.negative_prompt = "Low quality"
         self.resume = False
         self.seed = 0
         self.outputdir = './outputs/lucidscenedreamer_train'

@@ -1,130 +1,97 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from diffusers import StableDiffusionPipeline, DDIMScheduler, AutoencoderKL
-from transformers import CLIPTextModel, CLIPTokenizer
-
-
-class SDSTextEncoder(nn.Module):
-    """Wrapper for the Stable Diffusion text encoder."""
-    def __init__(self, device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base"):
-        super().__init__()
-        self.tokenizer = CLIPTokenizer.from_pretrained(pretrained_model_name_or_path, subfolder="tokenizer")
-        self.text_encoder = CLIPTextModel.from_pretrained(pretrained_model_name_or_path, subfolder="text_encoder")
-        self.text_encoder.eval() 
-        for p in self.text_encoder.parameters():
-            p.requires_grad = False
-
-        self.device = device
-        self.text_encoder = self.text_encoder.to(self.device)
-
-    def forward(self, prompt):
-        text_inputs = self.tokenizer(
-            prompt,
-            padding="max_length",
-            max_length=self.tokenizer.model_max_length,
-            truncation=True,
-            return_tensors="pt",
-        )
-        text_input_ids = text_inputs.input_ids.to(self.device)
-        if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
-            removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
-            print(
-                "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
-            )
-            text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
-        text_embeddings = self.text_encoder(text_input_ids.to(self.text_encoder.device))[0]
-        return text_embeddings
-
+from diffusers import StableDiffusionPipeline, DDIMScheduler
 
 class SDSLoss(nn.Module):
     def __init__(self, device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base",
-                 guidance_scale=7.5, reduction='mean', loss_scale=1.0, t_min=0.02, t_max=0.98):
+                 guidance_scale=7.5, t_range=[0.02, 0.98], precision=torch.float32):
         super().__init__()
 
-        self.guidance_scale = guidance_scale
-        self.pretrained_model_name_or_path = pretrained_model_name_or_path
-        self.text_encoder = SDSTextEncoder(device, pretrained_model_name_or_path)
         self.device = device
+        self.pretrained_model_name_or_path = pretrained_model_name_or_path
+        self.guidance_scale = guidance_scale
+        self.dtype = precision
 
-        # Use DDIM scheduler for faster sampling 
-        self.noise_scheduler = DDIMScheduler.from_pretrained(pretrained_model_name_or_path, subfolder="scheduler")
+        pipe = StableDiffusionPipeline.from_pretrained(
+            self.pretrained_model_name_or_path, torch_dtype=self.dtype,
+        )
 
-        self.unet = StableDiffusionPipeline.from_pretrained(
-            pretrained_model_name_or_path,
-            safety_checker=None,
-        ).unet.to(self.device)
-        self.unet.eval()
-        for p in self.unet.parameters():
-            p.requires_grad = False
+        pipe.to(self.device)
+        self.vae = pipe.vae
+        self.tokenizer = pipe.tokenizer
+        self.text_encoder = pipe.text_encoder
+        self.unet = pipe.unet
+        self.scheduler = DDIMScheduler.from_pretrained(
+            self.pretrained_model_name_or_path, subfolder="scheduler", torch_dtype=self.dtype,
+        )
 
-        self.vae = AutoencoderKL.from_pretrained(
-            pretrained_model_name_or_path, subfolder="vae",
-        ).to(self.device)
-        self.vae.eval()
-        for p in self.vae.parameters():
-            p.requires_grad = False
+        del pipe
 
-        self.reduction = reduction
-        self.loss_scale = loss_scale
+        self.num_train_timesteps = self.scheduler.config.num_train_timesteps
+        self.t_range = t_range
+        self.min_step = int(self.num_train_timesteps * t_range[0])
+        self.max_step = int(self.num_train_timesteps * t_range[1])
+        self.alphas = self.scheduler.alphas_cumprod.to(self.device) 
 
-        self.t_min = int(t_min * self.noise_scheduler.config.num_train_timesteps)
-        self.t_max = int(t_max * self.noise_scheduler.config.num_train_timesteps) 
+    @torch.no_grad()
+    def get_text_embeds(self, prompt):
+        inputs = self.tokenizer(prompt, padding='max_length', max_length=self.tokenizer.model_max_length, return_tensors='pt')
+        embeddings = self.text_encoder(inputs.input_ids.to(self.device))[0]
 
-    def get_text_embeddings(self, prompt, negative_prompt=""):
-
-        # Get embeddings for the prompt
-        with torch.no_grad():
-            text_embeddings = self.text_encoder(prompt)
-
-        # Get embeddings for the negative prompt
-        with torch.no_grad():
-            uncond_embeddings = self.text_encoder([negative_prompt] * len(prompt))
-
-        # Concatenate for CFG
-        text_embeddings = torch.cat([uncond_embeddings, text_embeddings])
-
-        return text_embeddings
+        return embeddings
     
-    def forward(self, images, text_embeddings, batch_size):
-        r"""Compute the SDS loss.
-
-        Args:
-            images (torch.Tensor): Batch of input images (B, C, H, W), values in [-1, 1].
-            text_embeddings (torch.Tensor): Text embeddings from the text encoder.
-        Returns:
-            torch.Tensor: SDS loss value.
-        """
-        with torch.amp.autocast('cuda', enabled=True):
-            # Image to latent
-            images = images * 0.5 + 0.5  # De-normalize from [-1, 1] to [0, 1]
-            latents = self.vae.encode(images).latent_dist.sample()
-            latents = latents * 0.18215  # Scale by the VAE scaling factor
-            latents = latents.to(self.device)
-
-            # Sample a timestep t.
-            timesteps = torch.randint(self.t_min, self.t_max + 1, (batch_size,), device="cuda", dtype=torch.long)
-
-            # Add noise to the images (forward diffusion process)
-            noise = torch.randn_like(latents)
-            noisy_images = self.noise_scheduler.add_noise(latents, noise, timesteps)
-                
-            # Get the predicted noise 
-            latent_model_input = torch.cat([noisy_images] * 2)
-            noise_pred = self.unet(latent_model_input, timesteps, encoder_hidden_states=text_embeddings).sample
-
-            # Classifier-free guidance:
-            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-            noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_text - noise_pred_uncond)
+    def get_noise_preds(self, latents_noisy, t, text_embeddings, guidance_scale=100):
+        latent_model_input = torch.cat([latents_noisy] * 2)
             
-            #predict the 'foregound' and take the gradient on it as the SDS loss. (v-objective in ldm)
-            w = (1 - self.noise_scheduler.alphas_cumprod[timesteps])
-            grad = w[:, None, None, None] * (noise_pred - noise)
+        tt = torch.cat([t] * 2)
+        noise_pred = self.unet(latent_model_input, tt, encoder_hidden_states=text_embeddings).sample
 
-            grad = torch.nan_to_num(grad)
-            target = (latents - grad)
-            loss = 0.5 * F.mse_loss(latents, target, reduction='none') 
-            loss = loss.mean()
-            
-        return loss * self.loss_scale
+        noise_pred_uncond, noise_pred_pos = noise_pred.chunk(2)
+        noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_pos - noise_pred_uncond)
+        
+        return noise_pred
+
+    def get_sds_loss(
+        self, 
+        latents,
+        text_embeddings, 
+        guidance_scale=100, 
+        grad_scale=1,
+    ):
+        t = torch.randint(self.min_step, self.max_step,
+                         (latents.shape[0],), device=latents.device)
+        noise = torch.randn_like(latents)
+        latents_noisy = torch.sqrt(
+            self.alphas[t]) * latents + torch.sqrt(1 - self.alphas[t]) * noise
+
+        noise_pred = self.get_noise_preds(
+            latents_noisy, t, text_embeddings, guidance_scale)
+        w = (1 - self.alphas[t])
+        grad = grad_scale * w[:, None, None, None] * (noise_pred - noise)
+        grad = torch.nan_to_num(grad)
+        targets = (latents - grad).detach()
+        loss = 0.5 * F.mse_loss(
+            latents.float(), targets, reduction='sum') / latents.shape[0]
+        return loss
+
+    def encode_imgs(self, imgs):
+        posterior = self.vae.encode(imgs).latent_dist
+        latents = posterior.sample() * self.vae.config.scaling_factor
+
+        return latents
+    
+    @torch.no_grad()
+    def decode_latents(self, latents):
+
+        latents = 1 / self.vae.config.scaling_factor * latents
+
+        imgs = self.vae.decode(latents).sample
+        imgs = (imgs / 2 + 0.5).clamp(0, 1)
+
+        return imgs
+
+    def forward(self, images, text_embeddings):
+        latents = self.encode_imgs(images)
+
+        return self.get_sds_loss(latents, text_embeddings, self.guidance_scale)

@@ -87,6 +87,9 @@ image_save_interval = cfg.image_save_iter # save image every 'image_save_interva
 output_dir = cfg.outputdir
 os.makedirs(output_dir, exist_ok=True)    # create output directory
 starting_iter = 1                         # for resuming
+# Create the 'checkpoints' subdirectory if it doesn't exist
+checkpoint_path = os.path.join(output_dir, "checkpoints")
+os.makedirs(checkpoint_path, exist_ok=True)  
 
 # --- Checkpoint Loading (for resuming) ---
 if cfg.resume:
@@ -100,9 +103,10 @@ if cfg.resume:
     else:
         print('No checkpoint found, training from beginning')
 
-# Get text prompt and encode it
-text_prompt = cfg.prompt
-text_embeddings = sds.get_text_embeddings([text_prompt], "")
+# Get text embeddings
+cond_embeddings = sds.get_text_embeds(cfg.prompt)
+uncond_embeddings = sds.get_text_embeds(cfg.negative_prompt)
+text_embeddings = torch.cat([uncond_embeddings, cond_embeddings])
 
 # --- Helper function to save images ---
 def save_image(image, output_dir, iteration):
@@ -117,23 +121,20 @@ def save_image(image, output_dir, iteration):
     filepath = os.path.join(images_dir, f"image_{iteration}.png")
     torchvision.utils.save_image(image, filepath)
 
-scaler = torch.amp.GradScaler('cuda')
-
 # --- Training Loop ---
 for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     start_time = time.time()
+    optimizer.zero_grad()
 
     # 1. Sample Camera and Render
     image = net_G()['fake_images'] 
 
     # 2. Compute SDS Loss
-    loss = sds(image, text_embeddings, 1)
+    loss = sds(image, text_embeddings)
 
     # 3. Backpropagation and Optimization
-    optimizer.zero_grad()
-    scaler.scale(loss).backward() 
-    scaler.step(optimizer)  
-    scaler.update() 
+    loss.backward() 
+    optimizer.step()  
     scheduler.step()
 
     end_time = time.time()
@@ -162,10 +163,6 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
         }, latest_checkpoint_path)
 
     if iteration % save_interval == 0 and iteration > 0:
-        # Create the 'checkpoints' subdirectory if it doesn't exist
-        checkpoint_path = os.path.join(output_dir, "checkpoints")
-        os.makedirs(checkpoint_path, exist_ok=True)  
-
         # Define the output file path
         output_path = os.path.join(checkpoint_path, f"checkpoint_{iteration}.pt")
         

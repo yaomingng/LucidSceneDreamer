@@ -1,10 +1,11 @@
 max_iter: 10001
-image_save_iter: 100
-logging_iter: 100
-snapshot_save_iter: 10000
+image_save_iter: 200
+logging_iter: 200
+snapshot_save_iter: 100000
 output_dir: ./outputs/lucidscenedreamer_train
 resume: False
-prompt: "Van Gogh Paint"
+prompt: "Van Gogh Painting"
+negative_prompt: "Low quality"
 pretrained_model: "./scenedreamer_models/scenedreamer_released.pt"
 randomised_seed: False
 seed: 2
