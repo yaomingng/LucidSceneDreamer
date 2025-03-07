@@ -1,5 +1,5 @@
 import torch
-import torch.optim as optim
+from torch.optim.lr_scheduler import LambdaLR
 from torchvision.utils import save_image
 import os
 from tqdm import tqdm
@@ -22,6 +22,8 @@ random_image = nn.Parameter(
             )
         ) * 2 - 1 
 
+random_image = random_image.clone().detach().requires_grad_(True)
+
 # Define a text prompt
 text_prompt = ["Cat lying on a table"]
 negative_text_prompt = ["Low quality"]
@@ -39,7 +41,7 @@ def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
         progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
         return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
-    return torch.optim.lr_scheduler(optimizer, lr_lambda, -1)
+    return LambdaLR(optimizer, lr_lambda, -1)
 
 # Initialize the optimizer.
 optimizer = torch.optim.AdamW([random_image], lr=0.1, weight_decay=0)

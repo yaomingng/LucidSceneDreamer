@@ -1,6 +1,6 @@
 import torch
-import torch.optim as optim
 import torchvision
+from torch.optim.lr_scheduler import LambdaLR
 from tqdm import tqdm
 import os
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
@@ -93,7 +93,7 @@ def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_st
         progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
         return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
-    return torch.optim.lr_scheduler(optimizer, lr_lambda, -1)
+    return LambdaLR(optimizer, lr_lambda, -1)
 
 # Initialize the optimizer.
 optimizer = torch.optim.AdamW(params_to_optimize, weight_decay=0)
