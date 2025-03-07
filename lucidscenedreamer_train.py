@@ -133,7 +133,7 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     loss = sds(image, text_embeddings)
 
     # 3. Backpropagation and Optimization
-    (loss * 2000).backward() 
+    loss.backward() 
     optimizer.step()  
     scheduler.step()
 
