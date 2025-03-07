@@ -54,6 +54,18 @@ net_G.load_state_dict(new_state_dict)
 sds = SDSLoss(device, pretrained_model_name_or_path=cfg.trainer.sds.pretrained_model_name_or_path,
                       guidance_scale=cfg.trainer.sds.guidance_scale)
 
+# --- Training Parameters ---
+num_iterations = cfg.max_iter             # Number of iterations to train for
+save_interval = cfg.snapshot_save_iter    # Save every 'save_interval' iterations
+log_interval = cfg.logging_iter           # Print loss every 'log_interval' iterations
+image_save_interval = cfg.image_save_iter # save image every 'image_save_interval' iterations
+output_dir = cfg.outputdir
+os.makedirs(output_dir, exist_ok=True)    # create output directory
+starting_iter = 1                         # for resuming
+# Create the 'checkpoints' subdirectory if it doesn't exist
+checkpoint_path = os.path.join(output_dir, "checkpoints")
+os.makedirs(checkpoint_path, exist_ok=True)  
+
 # Optimizer Setup
 # --- Parameter Freezing ---
 # --- Parameter Freezing ---
@@ -77,19 +89,7 @@ params_to_optimize = [
 optimizer = optim.Adam(params_to_optimize) 
 
 # Learning Rate Scheduler
-scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.1)
-
-# --- Training Parameters ---
-num_iterations = cfg.max_iter             # Number of iterations to train for
-save_interval = cfg.snapshot_save_iter    # Save every 'save_interval' iterations
-log_interval = cfg.logging_iter           # Print loss every 'log_interval' iterations
-image_save_interval = cfg.image_save_iter # save image every 'image_save_interval' iterations
-output_dir = cfg.outputdir
-os.makedirs(output_dir, exist_ok=True)    # create output directory
-starting_iter = 1                         # for resuming
-# Create the 'checkpoints' subdirectory if it doesn't exist
-checkpoint_path = os.path.join(output_dir, "checkpoints")
-os.makedirs(checkpoint_path, exist_ok=True)  
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=num_iterations, gamma=0.1)
 
 # --- Checkpoint Loading (for resuming) ---
 if cfg.resume:
