@@ -80,16 +80,6 @@ class SDSLoss(nn.Module):
         latents = posterior.sample() * self.vae.config.scaling_factor
 
         return latents
-    
-    @torch.no_grad()
-    def decode_latents(self, latents):
-
-        latents = 1 / self.vae.config.scaling_factor * latents
-
-        imgs = self.vae.decode(latents).sample
-        imgs = (imgs / 2 + 0.5).clamp(0, 1)
-
-        return imgs
 
     def forward(self, images, text_embeddings):
         latents = self.encode_imgs(images)
