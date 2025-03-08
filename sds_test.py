@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sds = SDSLoss(device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base", guidance_scale=200)
 
 # Create a random image (batch_size=1, channels=3, height=64, width=64)
-random_image = torch.rand((1, 3, 64, 64), device=device) 
+random_image = torch.rand((1, 4, 64, 64), device=device) 
 random_image.requires_grad_(True)  # Make the image trainable
 
 # Define a text prompt
