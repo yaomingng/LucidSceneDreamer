@@ -13,7 +13,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 sds = SDSLoss(device, pretrained_model_name_or_path="stabilityai/stable-diffusion-2-1-base", guidance_scale=200)
 
 # Create a random image (batch_size=1, channels=3, height=64, width=64)
-random_image = torch.rand((1, 3, 64, 64), device=device) * 2 - 1  # Scale to [-1, 1]
+random_image = torch.rand((1, 3, 64, 64), device=device) 
 random_image.requires_grad_(True)  # Make the image trainable
 
 # Define a text prompt
@@ -45,7 +45,7 @@ for iteration in tqdm(range(1, num_iterations), desc="Training"):
     optimizer.zero_grad()
 
     # Compute SDS loss
-    loss = sds(random_image, text_embeddings)
+    loss = sds.get_sds_loss(random_image, text_embeddings)
 
     # Backpropagate the loss
     loss.backward()
@@ -64,12 +64,6 @@ for iteration in tqdm(range(1, num_iterations), desc="Training"):
     if iteration % 200 == 0:
         with torch.no_grad():
             # Clamp the image to [-1, 1] and convert to [0, 1] for saving
-            image_to_save = (random_image.clamp(-1, 1) + 1) / 2
+            image_to_save = sds.decode_latents(random_image)
             save_path = os.path.join(output_dir, f"image_iter_{iteration}.png")
             save_image(image_to_save, save_path)
-
-# Final image
-with torch.no_grad():
-    final_image = (random_image.clamp(-1, 1) + 1) / 2
-    final_save_path = os.path.join(output_dir, "final_image.png")
-    save_image(final_image, final_save_path)  
