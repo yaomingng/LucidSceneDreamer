@@ -17,7 +17,7 @@ random_image = torch.rand((1, 4, 64, 64), device=device)
 random_image.requires_grad_(True)  # Make the image trainable
 
 # Define a text prompt
-text_prompt = ["Cat on a road"]
+text_prompt = ["Bob the builder"]
 negative_text_prompt = ["Low quality"]
 
 # Get text embeddings
@@ -39,7 +39,7 @@ os.makedirs(output_dir, exist_ok=True)
 log_file_path = os.path.join(output_dir, "sds_loss.txt")
 
 # Training loop
-num_iterations = 10001
+num_iterations = 1001
 for iteration in tqdm(range(1, num_iterations), desc="Training"):
     # Zero the gradients
     optimizer.zero_grad()
@@ -54,16 +54,14 @@ for iteration in tqdm(range(1, num_iterations), desc="Training"):
     optimizer.step()
     scheduler.step()
 
-    # Open the log file in append mode
     with open(log_file_path, 'a') as f:
-        # Print loss every 100 iterations
-        if iteration % 100 == 0:
+        # Write loss every 20 iterations
+        if iteration % 20 == 0:
             f.write(f"Iteration {iteration}: SDS Loss = {loss.item()}\n")
 
-    # Save the image every 200 iterations
-    if iteration % 200 == 0:
+    # Save the image every 20 iterations
+    if iteration % 20 == 0:
         with torch.no_grad():
-            # Clamp the image to [-1, 1] and convert to [0, 1] for saving
             image_to_save = sds.decode_latents(random_image)
             save_path = os.path.join(output_dir, f"image_iter_{iteration}.png")
             save_image(image_to_save, save_path)
