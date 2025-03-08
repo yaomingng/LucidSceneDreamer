@@ -39,7 +39,7 @@ os.makedirs(output_dir, exist_ok=True)
 log_file_path = os.path.join(output_dir, "sds_loss.txt")
 
 # Training loop
-num_iterations = 1001
+num_iterations = 501
 for iteration in tqdm(range(1, num_iterations), desc="Training"):
     # Zero the gradients
     optimizer.zero_grad()
@@ -55,8 +55,8 @@ for iteration in tqdm(range(1, num_iterations), desc="Training"):
     scheduler.step()
 
     with open(log_file_path, 'a') as f:
-        # Write loss every 20 iterations
-        if iteration % 20 == 0:
+        # Write loss every 50 iterations
+        if iteration % 50 == 0:
             f.write(f"Iteration {iteration}: SDS Loss = {loss.item()}\n")
 
     # Save the image every 20 iterations
