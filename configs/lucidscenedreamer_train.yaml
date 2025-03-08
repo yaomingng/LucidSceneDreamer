@@ -1,7 +1,7 @@
-max_iter: 50001
+max_iter: 100001
 image_save_iter: 500
 logging_iter: 1000
-snapshot_save_iter: 100000
+snapshot_save_iter: 1000000
 output_dir: ./outputs/lucidscenedreamer_train
 resume: False
 prompt: "Van Gogh Painting"
@@ -92,4 +92,4 @@ gen:
 trainer:
     sds:
         pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-        guidance_scale: 100
+        guidance_scale: 200
