@@ -1,10 +1,10 @@
-max_iter: 10001
+max_iter: 1001
 image_save_iter: 100
 logging_iter: 100
 snapshot_save_iter: 1000000
 output_dir: ./outputs/lucidscenedreamer_train
 resume: False
-prompt: "Van gogh painting"
+prompt: "Picasso blue period"
 negative_prompt: "Low quality"
 pretrained_model: "./scenedreamer_models/scenedreamer_released.pt"
 randomised_seed: False
@@ -12,9 +12,15 @@ seed: 2
 
 gen_opt:
     param_groups:
+        hash_encoder:
+            lr: 0.0001
+        render_net:
+            lr: 0.0001
         sky_net:
             lr: 0.0001
         style_net:
+            lr: 0.0001
+        denoiser:
             lr: 0.0001
 
 gen:
@@ -92,4 +98,4 @@ gen:
 trainer:
     sds:
         pretrained_model_name_or_path: "stabilityai/stable-diffusion-2-1-base"
-        guidance_scale: 200
+        guidance_scale: 150
