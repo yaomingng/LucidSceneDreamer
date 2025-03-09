@@ -86,8 +86,10 @@ class SDSLoss(nn.Module):
         return imgs
 
     def encode_imgs(self, imgs):
-        posterior = self.vae.encode(imgs).latent_dist
-        latents = posterior.sample() * self.vae.config.scaling_factor
+        # Resize to 512x512 if not already that size
+        if imgs.shape[2:] != (512, 512):
+            imgs = F.interpolate(imgs, size=(512, 512), mode="bilinear", align_corners=False)
+        latents = self.vae.encode(imgs).latent_dist.sample() * self.vae.config.scaling_factor
 
         return latents
 
