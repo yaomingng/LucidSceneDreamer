@@ -84,7 +84,7 @@ for name, param in net_G.named_parameters():
 
 params_to_optimize = [
     {'params': net_G.hash_encoder.parameters(), 'lr': cfg.gen_opt.param_groups['hash_encoder']['lr']},  
-    {'params': net_G.render_net.parameters(), 'lr': cfg.gen_opt.param_groups['sky_net']['lr']},  
+    {'params': net_G.render_net.parameters(), 'lr': cfg.gen_opt.param_groups['render_net']['lr']},  
     {'params': net_G.sky_net.parameters(), 'lr': cfg.gen_opt.param_groups['sky_net']['lr']},  
     {'params': net_G.style_net.parameters(), 'lr': cfg.gen_opt.param_groups['style_net']['lr']},
     {'params': net_G.denoiser.parameters(), 'lr': cfg.gen_opt.param_groups['denoiser']['lr']}
