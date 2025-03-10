@@ -1,4 +1,5 @@
 import torch
+import os
 
 def copy_tree_assets(checkpoint_path, asset_path, output_path):
     """
@@ -52,3 +53,4 @@ if __name__ == '__main__':
     output_path = "./outputs/lucidscenedreamer_train/checkpoints/modified_checkpoint.pt"  
 
     copy_tree_assets(checkpoint_path, asset_path, output_path)
+    os.system("python inference.py --config configs/scenedreamer_inference.yaml --output_dir ./outputs/lucidscenedreamer_train/inference/ --seed 8888 --checkpoint ./outputs/lucidscenedreamer_train/checkpoints/modified_checkpoint.pt")

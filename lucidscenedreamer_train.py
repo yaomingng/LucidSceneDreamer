@@ -184,3 +184,5 @@ for iteration in tqdm(range(starting_iter, num_iterations), desc="Training"):
     torch.cuda.empty_cache()
 
 print("Training Done!")
+
+os.system("python ./scripts/copy_tree_assets.py")
