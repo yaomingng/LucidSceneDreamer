@@ -44,6 +44,8 @@ def copy_tree_assets(checkpoint_path, asset_path, output_path):
     try:
         torch.save(checkpoint, output_path)
         print(f"Successfully saved modified checkpoint to {output_path}")
+        # Delete the old checkpoint file 
+        os.remove(checkpoint_path)
     except Exception as e:
         print(f"Error saving checkpoint: {e}")
 
