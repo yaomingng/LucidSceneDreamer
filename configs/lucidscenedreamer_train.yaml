@@ -18,10 +18,6 @@ gen_opt:
             lr: 0.0001
         sky_net:
             lr: 0.0001
-        style_net:
-            lr: 0.0001
-        denoiser:
-            lr: 0.0001
 
 gen:
     type: imaginaire.generators.lucidscenedreamer
