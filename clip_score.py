@@ -24,6 +24,8 @@ text_prompt = "Cubism"
 # Tokenize the text
 text_tokens = clip.tokenize([text_prompt]).to(device)
 
+print("Begin")
+
 with torch.no_grad():
     # Encode images and text
     image_features = model.encode_image(images_preprocessed)
@@ -32,7 +34,7 @@ with torch.no_grad():
     # Compute similarity scores
     logits_per_image = image_features @ text_features.T
     scores = logits_per_image.softmax(dim=-1).cpu().numpy()
-    
+
 # Save results to a text file
 output_file = "clip_similarity_scores.txt"
 with open(output_file, "w") as f:
