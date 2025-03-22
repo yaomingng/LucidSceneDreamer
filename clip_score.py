@@ -19,7 +19,7 @@ images = [Image.open(img_path) for img_path in image_paths]
 images_preprocessed = torch.stack([preprocess(img) for img in images]).to(device)
 
 # Define your text prompt
-text_prompt = ""
+text_prompt = "Cubism"
 
 # Tokenize the text
 text_tokens = clip.tokenize([text_prompt]).to(device)
@@ -32,10 +32,15 @@ with torch.no_grad():
     # Compute similarity scores
     logits_per_image = image_features @ text_features.T
     scores = logits_per_image.softmax(dim=-1).cpu().numpy()
+    
+# Save results to a text file
+output_file = "clip_similarity_scores.txt"
+with open(output_file, "w") as f:
+    f.write("Similarity scores for each image:\n")
+    f.write(np.array2string(scores, precision=4, separator=", ") + "\n")
+    
+    # Average the scores
+    average_score = np.mean(scores)
+    f.write(f"\n3D Scene Score: {average_score:.4f}\n")
 
-print("Similarity scores for each image:")
-print(scores)
-
-# Average the scores
-average_score = np.mean(scores)
-print(f"3D Scene Score: {average_score:.4f}")
+print(f"Results saved to {output_file}")
