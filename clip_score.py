@@ -8,7 +8,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
 # Define the text prompt
-text = "Low-poly dreamlike valley"
+text = "Cubism"
 text_input = clip.tokenize([text]).to(device)
 
 # Initialize a list to store scores
@@ -44,7 +44,7 @@ probabilities = torch.softmax(torch.tensor(scores), dim=0)
 average_probability = probabilities.mean().item()
 
 # Save the result to a text file
-with open("Low-poly_score.txt", "w") as f:
+with open("Cubism.txt", "w") as f:
     f.write(f"Average CLIP Score for '{text}': {average_probability}\n")
 
 print("Results saved")
