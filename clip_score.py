@@ -15,7 +15,7 @@ text_input = clip.tokenize([text]).to(device)
 scores = []
 
 # Path to the images folder
-image_folder = "images"
+image_folder = "./images"
 
 # Loop through all images in the folder
 for i in range(40):
