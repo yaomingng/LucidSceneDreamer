@@ -1,44 +1,48 @@
 import torch
-import open_clip
+import clip
 from PIL import Image
 import os
 
-# Load CLIP model
+# Load the CLIP model
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model, preprocess = open_clip.create_model_and_transforms("ViT-B/32", pretrained="openai")
-tokenizer = open_clip.get_tokenizer("ViT-B/32")
-model.to(device)
+model, preprocess = clip.load("ViT-B/32", device=device)
 
-# Path to images folder
-image_folder = "./images"
-image_filenames = [f"{i:05d}.png" for i in range(40)]  
+# Define the text prompt
+text = "Low-poly dreamlike valley"
+text_input = clip.tokenize([text]).to(device)
 
-# Define text prompt
-text_prompt = ["Low-poly dreamlike valley"]
-text_tokens = tokenizer(text_prompt).to(device)
+# Initialize a list to store scores
+scores = []
 
-# Compute CLIP scores for each image
-clip_scores = []
+# Path to the images folder
+image_folder = "images"
 
-for filename in image_filenames:
-    image_path = os.path.join(image_folder, filename)
-    
+# Loop through all images in the folder
+for i in range(40):
+    # Construct the image filename
+    image_filename = f"{i:05d}.png"
+    image_path = os.path.join(image_folder, image_filename)
+
     # Load and preprocess the image
-    image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
-    
-    # Get CLIP features
-    with torch.no_grad():
-        image_features = model.encode_image(image)
-        text_features = model.encode_text(text_tokens)
-        
-        # Normalize features
-        image_features /= image_features.norm(dim=-1, keepdim=True)
-        text_features /= text_features.norm(dim=-1, keepdim=True)
-        
-        # Compute cosine similarity (CLIP score)
-        score = (image_features @ text_features.T).item()
-        clip_scores.append(score)
+    image = Image.open(image_path).convert("RGB")
+    image_input = preprocess(image).unsqueeze(0).to(device)
 
-# Compute average CLIP score
-average_clip_score = sum(clip_scores) / len(clip_scores)
-print(f"Average CLIP Score for the scene: {average_clip_score:.4f}")
+    # Calculate CLIP score
+    with torch.no_grad():
+        image_features = model.encode_image(image_input)
+        text_features = model.encode_text(text_input)
+        logits_per_image, _ = model(image_input, text_input)
+        score = logits_per_image.item()
+        scores.append(score)
+
+    print(f"Processed {image_filename}: CLIP Score = {score}")
+
+# Calculate the average score
+average_score = sum(scores) / len(scores)
+print(f"Average CLIP Score: {average_score}")
+
+# Save the result to a text file
+with open("Low-poly_score.txt", "w") as f:
+    f.write(f"Average CLIP Score for '{text}': {average_score}\n")
+
+print("Results saved")
