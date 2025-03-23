@@ -19,12 +19,10 @@ images = [Image.open(img_path) for img_path in image_paths]
 images_preprocessed = torch.stack([preprocess(img) for img in images]).to(device)
 
 # Define your text prompt
-text_prompt = "Cubism"
+text_prompt = "Low-poly dreamlike valley"
 
 # Tokenize the text
 text_tokens = clip.tokenize([text_prompt]).to(device)
-
-print("Begin")
 
 with torch.no_grad():
     # Encode images and text
