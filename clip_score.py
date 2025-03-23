@@ -35,14 +35,16 @@ for i in range(40):
         score = logits_per_image.item()
         scores.append(score)
 
-    print(f"Processed {image_filename}: CLIP Score = {score}")
+    print(f"Processed {image_filename}")
 
-# Calculate the average score
-average_score = sum(scores) / len(scores)
-print(f"Average CLIP Score: {average_score}")
+# Convert raw logits to probabilities using softmax
+probabilities = torch.softmax(torch.tensor(scores), dim=0)
+
+# Calculate the average probability
+average_probability = probabilities.mean().item()
 
 # Save the result to a text file
 with open("Low-poly_score.txt", "w") as f:
-    f.write(f"Average CLIP Score for '{text}': {average_score}\n")
+    f.write(f"Average CLIP Score for '{text}': {average_probability}\n")
 
 print("Results saved")
